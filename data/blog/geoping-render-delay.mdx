@@ -1,0 +1,57 @@
+---
+title: 'geoping 中页面渲染较慢的问题'
+date: '2024-02-21'
+lastmod: '2024-02-21'
+tags: ['react', 'JavaScript', 'geoping']
+draft: false
+summary: '分析 geoping 中页面渲染较慢的问题的原因'
+images: ['/static/images/twitter-card.png']
+---
+
+在 geoping 中, 会出现当请求完成后, 渲染每条数据时时间间隔较长的问题:
+
+![preview](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-0Y5yJw.jpg)
+
+红框中每条数据出现的时间间隔比较长.
+
+可以从以下两个方面分析这个问题
+
+## 获取数据的时间间隔
+
+由于 geoping 是流式请求, 因此可以通过在 stream 时间处理函数中打印当前时间戳得到从服务器获取数据的具体时间:
+
+![handle code](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-hbmYQA.png)
+
+可以在控制台上看到以下输出:
+
+![log](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-N5yQym.png)
+
+经过计算可以得出每条数据接收时间间隔:
+
+![time](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-doRjC5.png)
+
+这时, 可以看出问题应该就是服务器返回的每条数据的时间间隔比较长, 从而导致页面加载时间较长.
+
+## 页面渲染所需要的时间
+
+在上面的步骤中可以得出问题出现的原因应该是服务器返回数据间隔时间较长, 不过也可以顺便看一下页面渲染这个方面.
+
+在 react 中, 可以使用 `useLayoutEffect` 获取页面渲染所花费的时间:
+
+首先对会改变的 DOM 进行引用, 然后计算数据更改时页面重新渲染所花费的时间.
+
+![render code](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-U8sBYZ.png)
+
+在控制台中会打印类似的结果:
+
+![render time log](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-IM9bd3.png)
+
+可以看出页面渲染并没有花费太多的时间.
+
+## 结论
+
+同时打印两次的结果, 可以得到类似于下面的结果:
+
+![combine log](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-TPeZJ3.png)
+
+通过将每次从服务器接收到数据的时间间隔相减, 再与页面渲染时间相比较, 可以明显得出是服务器返回数据间隔太长的原因.
