@@ -40,6 +40,14 @@ images: ['/static/images/twitter-card.png']
 
 首先对会改变的 DOM 进行引用, 然后计算数据更改时页面重新渲染所花费的时间.
 
+`window.performance.now()` 表示自页面加载以来的时间, 而在页面中, `result` 的更改会导致页面的重新渲染, 因此可以将 `result` 作为依赖.
+
+`setTimeout` 会被放置在宏任务队列中, 设置时间为 `0` 表示在当前执行栈清空后, 下一个宏任务开始之前执行. 这意味着 `setTimeout` 会在下一个事件循环中执行.
+
+当 `useLayoutEffect`, `window.performance.now()` 以及 `setTimeout` 同时使用时, 可以这样简单理解:
+
+![example code](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0222-BNNJpv.png)
+
 ![render code](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0221-U8sBYZ.png)
 
 在控制台中会打印类似的结果:
