@@ -1,8 +1,8 @@
 interface Project {
-  title: string,
-  description: string,
-  href?: string,
-  imgSrc?: string,
+  title: string
+  description: string
+  href?: string
+  imgSrc?: string
 }
 
 const projectsData: Project[] = [
@@ -15,12 +15,10 @@ const projectsData: Project[] = [
     href: 'https://www.google.com',
   },
   {
-    title: 'The Time Machine',
-    description: `Imagine being able to travel back in time or to the future. Simple turn the knob
-    to the desired date and press "Go". No more worrying about lost keys or
-    forgotten headphones with this simple yet affordable solution.`,
-    imgSrc: '/static/images/time-machine.jpg',
-    href: '/blog/the-time-machine',
+    title: 'geoping.gg',
+    description: `一个开源的项目，用于检测一个网站在全球范围内的的连接状况。`,
+    imgSrc: 'https://cdn.pixabay.com/photo/2018/03/15/16/11/background-3228704_1280.jpg',
+    href: 'https://geoping.gg/',
   },
 ]
 
