@@ -1,0 +1,91 @@
+---
+title: Prompt 的最佳实践
+date: '2024-03-28'
+tags: ['AI', 'prompt']
+draft: false
+summary: 'AI 模型的最佳实践, 如何为模型编写出更清晰有效的 prompt'
+---
+
+# prompt 引擎是如何工作的
+
+对于 AI 模型来到或, 有一些特定的 prompt 格式效果会特别好, 能带来更有用的模型输出结果.
+
+下面的 prompt 的格式从输出结果来看, 都比一般 prompt 提供更好的输出.
+
+## 将指示放在 prompt 的开头, 并使用 `###` 或 `"""` 将指示和内容分开
+
+> Summarize the text below as bullt point list of the most import points.
+>
+> Text: """
+>
+> \{text input here}
+>
+> """
+
+## 对所需的北京, 结果, 长度, 格式, 风格等尽可能具体, 详细和是描述性而不是抽象的.
+
+> Write a short inspiring poem about OpenAI, focusing on the recent DALL-E product launch (DALL-E is a text to image ML model) in the style of a \{famous poet}
+
+## 通过示例阐明所需的输出格式
+
+> Extract the important entities mentioned in the text below. First extract all company names, then extract all people names, then extract specific topics which fit the content and finally extract general overarching themes
+>
+> Desired format:
+> Company names: \<comma_separated_list_of_company_names>
+> People names: -||-
+> Specific topics: -||-
+> General themes: -||-
+>
+> Text: \{text}
+
+## 从零样本开始, 然后是少量样本, 都不起作用的话再进行微调
+
+零样本:
+
+> Extract keywords from the below text.
+>
+> Text: \{text}
+
+> Keywords:
+
+少量样本:
+
+> Extract keywords from the corresponding texts below.
+
+> Text 1: Stripe provides APIs that web developers can use to integrate payment processing into their websites and mobile applications.
+> Keywords 1: Stripe, payment processing, APIs, web developers, websites, mobile applications
+>
+> Text 2: OpenAI has trained cutting-edge language models that are very good at understanding and generating text. Our API provides access to these models and can be used to solve virtually any task that involves processing language.
+> Keywords 2: OpenAI, language models, text processing, API.
+>
+> Text 3: \{text}
+> Keywords 3:
+
+## 减少浮夸和不精确的描述
+
+> Use a 3 to 5 sentence paragraph to describe this product.
+
+## 说明想要做什么而不是不要做什么
+
+> The following is a conversation between an Agent and a Customer. The agent will attempt to diagnose the problem and suggest a solution, whilst refraining from asking any questions related to PII. Instead of asking for PII, such as username or password, refer the user to the help article www.samplewebsite.com/help/faq
+>
+> Customer: I can’t log in to my account.
+> Agent:
+
+## 针对代码生成 - 使用引导词将墨香引入特定模式
+
+> \# Write a simple python function that
+>
+> \# 1. Ask me for a number in mile
+>
+> \# 2. It converts miles to kilometers
+>
+> import
+
+## 参数
+
+一般来说, `model` 和 `temperature` 是改变模型输出最常用的参数
+
+1. `model` - 高性能的模型一般更贵并且有较高的延迟
+2. `temperature` - 衡量模型输出不太可能的标记的频率. 值越高输出越随机 (更有创意).
+3. `max_tokens` (maximum length) - 不控制输出的长度, 但对 token 生成有硬性截止的限制. 一般不会达到此限制

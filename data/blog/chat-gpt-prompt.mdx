@@ -1,0 +1,104 @@
+---
+title: '如何编写 ChatGPT 的 prompt 以提升 AI 模型正确性'
+date: '2024-03-28'
+tags: ['prompt', 'ChatGPT', 'AI']
+draft: false
+layout: PostBanner
+images: ['https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0328-coverImg_169_2024328105835.png']
+summary: 如何编写更加规范的 prompt, 使 AI 大语言模型按照自己需要的方式回答问题
+---
+
+# 使 AI 回答更加符合需求的 6 个策略
+
+[原文](https://platform.openai.com/docs/guides/prompt-engineering/six-strategies-for-getting-better-results)来自于 ChatGPT 官方文档, 这篇文章是对这些内容的总结.
+
+## 使用英文作为 prompt
+
+## 编写清晰的指示
+
+如果觉得回答太长, 可以要求简短回复, 同样如果觉得回答太简单, 可以要求详细说明.
+
+| Worse                                          | Better                                                                                                                                                                                                      |
+| :--------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Write code to calculate the Fibonacci sequence | Write a TypeScript function to efficiently calculate the Fibonacci sequence. Comment the code liberally to explain what each piece does and why it's written that way.                                      |
+| Summarize the meeting notes.                   | Summarize the meeting notes in a single paragraph. Then write a markdown list of the speakers and each of their key points. Finally, list the next steps or action items suggested by the speakers, if any. |
+
+也可以按照指定的格式, 只需要演示指定的格式, 模型就会按照这种格式回答.
+
+> Use the following step-by-step instructions to respond to user inputs.
+>
+> Step 1 - The user will provide you with text in triple quotes. Summarize this text in one sentence with a prefix that says "Summary: ".
+>
+> Step 2 - Translate the summary from Step 1 into Spanish, with a prefix that says "Translation: ".
+
+## 提供参考信息
+
+为模型提供参考文本可以提高回答的正确率.
+
+> You will be provided with a document delimited by triple quotes and a question. Your task is to answer the question using only the provided document and to cite the passage(s) of the document used to answer the question. If the document does not contain the information needed to answer this question then simply write: "Insufficient information." If an answer to the question is provided, it must be annotated with a citation. Use the following format for to cite relevant passages (\{"citation": …}).
+
+## 拆分复杂任务
+
+向模型发布复杂任务可能会导致错误率更高, 而复杂任务通常可以被拆分为几个简单的任务.
+
+几个简单的任务组合在一起就是一个工作流程, 前面的任务的输出就是后面任务的输入
+
+例如要总结一本书的内容, 可以使用一系列查询总结一本书的每个章节, 生成每个章节的摘要. 并在最后生成所有章节摘要的摘要, 也就是整本书的摘要.
+
+## 提供详细的过程
+
+给出详细的过程可以使模型更可靠地推理出正确答案.
+
+> SYSTEM:
+> Determine if the student's solution is correct or not.
+>
+> USER:
+> Problem Statement: I'm building a solar power installation and I need help working out the financials.
+>
+> - Land costs $100 / square foot
+> - I can buy solar panels for $250 / square foot
+> - I negotiated a contract for maintenance that will cost me a flat $100k per year, and an additional $10 / square foot
+>   What is the total cost for the first year of operations as a function of the number of square feet.
+>   Student's Solution: Let x be the size of the installation in square feet.
+>
+> 1.  Land cost: 100x
+> 2.  Solar panel cost: 250x
+> 3.  Maintenance cost: 100,000 + 100x
+>     Total cost: 100x + 250x + 100,000 + 100x = 450x + 100,000
+>
+> ASSISTANT:
+> The student's solution is correct.
+
+## 使用外部工具
+
+可以通过向模型提供其他工具的输出来弥补模型的弱点. 模型可以利用外部信息源, 这可以帮助模型生成更准确和最新的响应.
+
+例如, 如果询问某个电影的问题, 可以将电影相关的信息添加到输入中, 从而得到更准确的回答.
+
+也可以指定模型编写和运行代码, 而不是模型自己计算:
+
+> SYSTEM:
+> You can write and execute Python code by enclosing it in triple backticks, e.g. \```code goes here```. Use this to perform calculations.
+>
+> USER:
+> Find all real-valued roots of the following polynomial: 3\*x\*\*5 - 5\*x\*\*4 - 3\*x\*\*3 - 7\*x - 10.
+
+## 系统地测试更改
+
+有时对独立的 prompt 的更改会得到更好的回答, 但对于整体的 prompt 会导致整体变差.
+
+因此需要定义一个全面的测试套件, 也称为评估 (eval).
+
+> You will be provided with text delimited by triple quotes that is supposed to be the answer to a question. Check if the following pieces of information are directly contained in the answer:
+>
+> - Neil Armstrong was the first person to walk on the moon.
+> - The date Neil Armstrong first walked on the moon was July 21, 1969.
+>
+> For each of these points perform the following steps:
+>
+> 1 - Restate the point.
+> 2 - Provide a citation from the answer which is closest to this point.
+> 3 - Consider if someone reading the citation who doesn't know the topic could directly infer the point. Explain why or why not before making up your mind.
+> 4 - Write "yes" if the answer to 3 was yes, otherwise write "no".
+>
+> Finally, provide a count of how many "yes" answers there are. Provide this count as \{"count": \<insert count here>}.
