@@ -1,0 +1,76 @@
+---
+title: 'Cookie, Session, 和 Token'
+description: 'Cookie, Session, 和 Token 的区别究竟在哪里? 如何进行身份验证'
+date: '2024-04-09'
+tags: ['next js', 'guide']
+draft: false
+summary: '文章将详细解释 Cookie, Session, 和 Token 的区别, 以及如何进行身份验证, 在什么情况下应该以什么样的方式进行身份验证'
+images: ['https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0409-coverImg_169_2024491858.png']
+---
+
+# Cookie, Session, 和 Token
+
+在前端项目开发中, 经常会遇到请求时携带一些数据以进行身份验证. 这些数据可能是 Cookie, Session, 或者 Token.
+
+本文将详细解释什么是Cookie, Session, 和 Token, 以及它们之间的区别.
+
+## HTTP 无状态
+
+自从使用账号登录某个网站后, 可能很长一段时间都不会再需要输入账号和密码.
+
+但 HTTP 是无状态的, 每个请求都相互独立, 服务器不会保留任何关于之前的请求的信息.
+
+因此如果需要进行会话管理, 则需要使用 Cookie, Session 或是 Token.
+
+这三种方式的核心概念是*存储*.
+
+## Cookie
+
+Cookie 是一种存储在浏览器中的数据. 它由服务器生成, 并发送给浏览器, 浏览器会将 Cookie 保存起来.
+
+Cookie 的工作流程大致为:
+
+1. 浏览器发起 HTTP 请求, 服务器进行 Cookie 设置, 也就是 Set-Cookie
+2. Cookie 中有 `Name` 和 `Value` 两个重要的属性, 服务器会将这两个属性填充完整
+3. Cookie 发给浏览器后, 浏览器会保存
+4. 之后浏览器的请求都会携带 Cookie, 服务器通过读取 Cookie 中的信息来判断用户身份
+
+## Session
+
+Session 是一种存储在服务器中的数据. 它由服务器生成, 并发送给浏览器, 浏览器会将 Session 保存起来.
+
+Session 的工作流程大致为:
+
+1. 首先使用用户名和密码进行登录, 将登录信息发送给服务器
+2. 服务器验证登录信息后, 创建一个 Session ID 和会话结束时间
+3. 服务器通过 Cookie 将 Session ID 和会话结束时间发送给浏览器
+4. 浏览器保存 Cookie, 包括 Cookie 中的 Session ID
+5. 之后浏览器的请求都会携带 Cookie 中的 Session ID, 服务器通过读取 Session ID 来判断用户身份
+6. 有效期失效后, 服务器会销毁 Session, 浏览器也会删除 Cookie
+
+## JWT
+
+JWT 是一种存储在浏览器中的数据. 它由服务器生成, 并发送给浏览器, 浏览器会将 JWT 保存起来.
+
+1. 首先使用用户名和密码进行登录, 将登录信息发送给服务器
+2. 服务器验证登录信息后, 创建一个 JWT 并发送给浏览器, 并保留 JWT 签名的密文
+3. 浏览器以 Cookie 或 LocalStorage 的方式保存 JWT
+4. 之后浏览器的请求都会携带 JWT, 服务器通过读取 JWT 中的信息来判断用户身份
+
+JWT 是由三部分组成的
+
+- Header: 声明使用什么算法生成签名
+- Payload: 包含 JWT 的数据, 比如用户名, 过期时间等
+- Signature: 用于验证 JWT 是否被篡改
+
+Header 和 Payload 会经由 Base64 编码后拼接在一起, 然后通过 Header 中声明的算法生成签名, 服务器会保存签名信息用户验证 JWT 是否被更改.
+
+## 总结
+
+Session 由服务器生成并保存在服务器中, 由服务器主导一切.
+
+Cookie 是一种载体, 把 Session 保存在 Cookie 中发送到客户端, Cookie 会跟随浏览器的每个 HTTP 请求.
+
+Cookie 有服务器生成, 保存在浏览器, 由客户端主导一切. 可以放在浏览器的 Cookie 或者 LocalStorage 中.
+
+Token 就像持有 _令牌_ 一样可以访问服务器, 服务器会保存 Token 的签名信息, 用于验证 Token 是否被更改.
