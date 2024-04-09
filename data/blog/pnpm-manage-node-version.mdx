@@ -1,0 +1,75 @@
+---
+title: '使用 pnpm 管理 node 版本'
+date: '2024-04-03'
+tags: ['pnpm', 'nodejs']
+draft: false
+summary: '使用 pnpm 管理 node 版本'
+images: ['https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0409-coverImg_169_202449151913.png']
+---
+
+# 使用 pnpm 管理 nodejs 版本
+
+在进行前端项目开发的过程中, 由于版本兼容性问题有时会需要频繁的切换 nodejs 版本. 因此在 GitHub 上有很多可以管理 nodejs 版本的工具, 而 `nvm` 就是其中之一, 也是比较受欢迎的 nodejs 版本管理工具.
+
+## 使用 nvm 管理 nodejs 版本过程中遇到的问题
+
+在使用 nvm 管理 nodejs 版本过程中, 会有一些问题, 比如切换 nodejs 版本后, 需要重新安装依赖, 并且需要重新启动项目. 以及在某个项目中切换版本后, 在另一项目中又会使用默认版本. 还有需要进行环境变量的配置等.
+
+## 使用 pnpm 管理 nodejs 版本
+
+在 pnpm 的[官方网站](https://pnpm.io/zh/cli/env)中可以看到, 使用 pnpm 的 CLI 命令就可进行 nodejs 版本的切换. 并且 pnpm 还提供了 `pnpm env` 命令, 用于管理 nodejs 版本.
+
+### 安装 pnpm
+
+与平常方式安装 pnpm 不同的是, 使用 `pnpm env` 管理 nodejs 版本的 pnpm, 必须使用独立脚本安装.
+
+也就是说, 不依赖 node 环境, 直接通过 cURL 安装独立的 pnpm:
+
+```bash
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+```
+
+### 通过 pnpm 安装各版本 nodejs
+
+在安装完成 pnpm 之后, 就可以下载各个版本的 nodejs 了.
+
+```bash
+# 安装长期支持版本
+pnpm env add --global lts 18
+
+# 安装最新稳定版本
+pnpm env add --global stable
+
+# 安装最新版本
+pnpm env add --global latest
+```
+
+上面的这种方式只是下载各版本 nodejs 并没有使用, 使用下面的命令以使用指定版本的 nodejs:
+
+```bash
+# 使用长期支持版本
+pnpm env use 18
+
+# 使用最新稳定版本
+pnpm env use --global stable
+
+# 使用最新版本
+pnpm env use --global latest
+```
+
+当使用 `pnpm env use` 命令时使用的 nodejs 并没有下载到本地时, 会先下载到本地然后再使用.
+
+### `pnpm env` 的一些其他命令和配置
+
+```bash
+# 列出所有可用的 nodejs 版本
+pnpm env list
+
+# 删除指定版本的 nodejs
+pnpm env remove 18
+
+# 删除所有版本的 nodejs
+pnpm env remove --global
+```
+
+其中 `-g` 表示全局安装, 如果不加 `-g` 则表示当前项目安装.
