@@ -1,0 +1,190 @@
+---
+title: '了解最可靠的前端架构'
+date: '2024-04-10'
+tags: ['frontend', 'architecture']
+draft: false
+summary: 'Feature Sliced Design (功能分割设计) 是专为前端项目设计的最现代, 最可靠的架构之一. 几乎可以适应任何业务需求, 解决日常所有问题...'
+image: ['https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0410-coverImg_169_2024410185936.png']
+---
+
+# 了解最可靠的前端架构
+
+[原文地址](https://blog.bitsrc.io/understand-the-most-reliable-frontend-architecture-c8578e3166b)
+
+在需求不断变化的开发中, 很难找到始终合适且可靠的架构. 需要的是灵活, 易于扩展, 易于维护, 易于理解并能使新开发人员快速上手的架构.
+
+**_Feature Sliced Design (功能分割设计) _**是专为前端项目设计的最现代, 最可靠的架构之一. 几乎可以适应任何业务需求, 解决日常所有问题, 并且对新手来说很直观.
+
+本文将介绍该架构的基础知识以及提供入门所需的基本知识.
+
+**内容列表**
+
+- 架构概述
+- 架构的优点和缺点
+- 与 "Simple Modular" 架构的比较
+- 总结
+
+## 架构概述
+
+因为其不可否认的优势, "功能分割" 架构在前端社区中越来越受欢迎. 事实证明它具有高度扩展性和可靠性, 成为大型团队处理复杂项目的最佳选择.
+
+这种架构的巨大优势, 帮助其从其他前端架构中脱颖而出的它是**_业务主导_**的. 这导致它适应几乎任何项目并且在添加新功能的同时保持项目很好的运行. 此外, 它也可以被逐步采用, 因此可以在现有的项目中使用. 但是仅限于前端.
+
+在这个架构中, 项目由 **_layers (层) _**组成, 每层由 **_slices (片) _**组成, 每片由 **_segment (段)_** 组成. 下面是这个架构的图例:
+
+![feature-sliced-design](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0410-1SqeVt.png)
+
+### Layers
+
+这个架构的顶层文件夹称为层, 是应用的第一层. 有严格的数量要求, 一些是可选的. 层是标准化的, 目前有 7 个层:
+
+- **_Shared layer (共享层)_**: 包含各种可重用, 独立的业务逻辑. UI-kit, helpers 和 loggers 都是完美的例子.
+- **_Entities layer (实体层)_**: 包含特定于项目业务实体, 例如 `User`, `Payment`, `Products` 等.
+- **_Feature layer (功能层)_**: 包含用户信息, 以及为用户带来商业价值的代码. 例如 `ChangePassword`, `MakePayment`, `BuyProduct`.
+- **_Widgets layer (部件层)_**: 包含混合实体和功能的组件, 例如 `UserSettings`, `PaymentsList`, `ProductsList`.
+- **_Pages layer (页面层)_**: 包含应用页面, 是由实体层, 功能层和部件层构建的组合层.
+- **_Processes layer (处理层)_**: 包含复杂的页面场景. 例如身份验证和验证码.
+- **_App layer (应用层)_**: 包含应用设置, 样式和支持. 例如 `withAuth` 高阶组件.
+
+每层都有自己的职责范围, 并且可以看出它们都是高度面向业务的. 此外, 它们具有阶梯式层次结构, 因为它创建了一个可理解的单向数据流, 在架构的可用性中发挥着重要作用.
+
+![layers-structure](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0410-Q27hxK.png)
+
+层次越低, 重构的风险就越大. 如果更改 Shared layer 中的 `Model` 组件, 可能会对应用的其余部分产生巨大的影响.
+
+### Slices
+
+简单来说 **_Slices _**是 **_layer _**的子文件夹, 并依赖与项目细节, 团队和技术栈. 此外, 不与层等抽象事物耦合, 每个片代表一个特定的事物. 可以理解为模块. 它们也有自己的规则:
+
+- 同一层的片不能直接相互使用.
+- 它们的组合应该放置在当前片的上层.
+- 在大多数情况下, 应当避免在片中嵌套, 而仅使用按文件夹进行结构分组.
+
+下面是每个层的片的例子:
+
+```Plain Text
+├── app/
+|   # Application composition layer
+|   # Only contains abstract initialization logic and static assets, and thus mustn't contain any Slices
+|
+├── processes/
+|   # Slices implementing page-independent workflows or workflows involving multiple pages
+|   ├── auth
+|   ├── payment
+|   ├── quick-tour
+|
+|
+├── pages/
+|   # Slices implementing complete application views
+|   ├── feed
+|   |
+|   ├── profile
+|   |   # Due to routing specifics, this layer can contain nested structures
+|   |   ├── edit
+|   |   └── stats
+|   |
+|   ├── sign-up
+|
+|
+├── widgets/
+|   # Slices implementing various combinations of abstract and / or business units from lower layers,
+|   # to deliver isolated atomic User Interface fragments
+|   ├── chat-window
+|   ├── header
+|   ├── feed
+|
+|
+├── features/
+|   # Sliced implementing user scenarios, which usually operate on business entities
+|   ├── auth-by-phone
+|   ├── create-post
+|   ├── write-message
+|
+|
+├── entities/
+|   # Slices implementing business units in terms of which application business logic works
+|   ├── account
+|   ├── conversation
+|   ├── post
+|   ├── wallet
+|
+|
+├── shared/
+|   # This layer is a set of abstract Segments
+|   # It means that it must not contain any business units or business-related logic
+```
+
+### Segments
+
+每个 **_Slice _**包含更小的被称为**_ Segments _**的模块. 旨在技术上分离片中的代码. 下面是常见的段的列表, 可以灵活省略或添加段:
+
+- **_UI segment_**: 只包含 UI 逻辑.
+- **_Model segment_**: 包含业务逻辑, 例如存储, 操作, 作用等.
+- **_Lib segment_**: 包含基础架构逻辑, 例如 `utils` 和 `helpers`.
+- **_Config segment_**: 包含片的配置.
+- **_API segment_**: 包含 API 请求的逻辑, 例如请求本身或 API 实例.
+
+### Public API
+
+每个片和段都必须有自己的 **_Public API _**声明. 这只是一个索引文件, 代表模块内部的访问点, 并定义外部如何与模块交互.
+
+```Plain Text
+└── features/ #
+ ├── auth-form / # Internal structure of the feature
+ | ├── ui/ #
+ | ├── model/ #
+ | ├── {…}/ #
+ | ├── index.ts # Entrypoint with its public API
+```
+
+由于 **_Public API_** 是模块的入口点, 因此需要遵循以下规则:
+
+- 应用中的其他部分只能使用在公共接口中提供的模块实体.
+- 不在公共接口中的模块内部的部分只能由模块本身访问.
+
+声明良好的公共接口应该方便应用的其余部分使用, 并可以适应模块内部的能改. 因此在修改某些内容时, 不必在很多地方更改导入.
+
+## 架构的优缺点
+
+毫无疑问, **_Feature Sliced Design_** 带来了巨大的价值. 与其他架构相比, 它几乎在任何领域都表现得很出色, 主要优点包括:
+
+- 由业务和用户需求主导.
+- 逻辑的受控重用.
+- 面对更改和重构的稳定性.
+- 架构和团队方面的高度可扩展性.
+- 可逐步采用.
+- 独立于技术栈.
+- 高标准化.
+- 完善的文档和庞大的社区.
+
+缺点:
+
+- 从一开始就增加了更多的项目知识, 因为必须学习架构内容. 但随着项目的扩大, 它也极大地减少了项目知识.
+- 不适合 MVP (Minimum Viable Product, 最低可行产品) 和短期项目, 因为会增加开发时间, 并在近处不会获得任何显著的好处.
+- 需要特殊的团队文化和严格的代码审查来遵循架构的所有原则.
+
+总的来说, **_Feature Sliced Design_** 是一个强大的能带来巨大价值的架构. 通过将应用分割为小的, 模块组件来创建低耦合高内聚代码.
+
+## 与 "Simple Modular" 架构的比较
+
+对于任何中 / 高度复杂的项目, **_Feature Sliced Design_** 可能更适合, 因为它的确解决了许多基本的架构问题, 几乎没有任何缺点.
+
+如果注重简单性和开发速度, **_Simple Modular_** 有更高的优先级, 对于 MVP 和小型短期项目, **_Simple Modular_** 可能更合适.
+
+## 总结
+
+**_Feature Sliced Design_** 是一种面向业务需求的前端架构, 特点是高可扩展性, 易于理解和维护, 适用于大型团队开发复杂项目.
+
+**_Feature Sliced Design_** 的主要组成部分: 层 (Layer), 片 (Slice), 和段 (Segment). **_Feature Sliced Design_** 的优点包括高可扩展性, 易于理解和维护, 适用于大型团队开发复杂项目; 其缺点是需要学习成本较高, 不适合 MVP 或短期项目.
+
+**_Feature Sliced Design_** 与 **_Simple Modular_** 架构相比, 中等和高复杂度的项目更适合 **\*Feature Sliced Design\*\***.\*
+
+### 要点
+
+- **_Feature Sliced Design_** 是一种面向业务需求的前端架构, 适用于大型团队开发复杂项目.
+- 在 **_Feature Sliced Design_** 中, 项目由层 (**_Layer_**), 片 (**_Slice_**) 和段 (**_Segment_**) 组成.
+- 每个层次都有自己的职责范围, 并且呈现分阶层的结构.
+- 片是层次的子目录, 依赖项目特定, 团队和技术栈.
+- 每个片包含多个段, 每个段负责单个技术目的的代码分离.
+- **_Feature Sliced Design_** 的优点包括高可扩展性, 易于理解和维护, 适用于大型团队开发复杂项目; 其缺点是需要学习成本较高, 不适合 MVP 或短期项目.
+- 建议对中等和高复杂度的项目采用 **_Feature Sliced Design_**, 而对 MVP 或短期项目, 则可以采用 **_Simple Modular_** 架构.
