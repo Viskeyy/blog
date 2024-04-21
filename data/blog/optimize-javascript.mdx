@@ -1,0 +1,404 @@
+---
+title: '优化 JavaScript'
+date: '2024-04-22'
+tags: ['code', 'javascript']
+draft: false
+summary: 'JavaScript 代码的运行速度可能比实际速度要慢得多, 这是因为它没有得到适当的优化. 本文总结了常见的优化技术, 包括避免不必要的工作, 避免字符串比较, 避免不同的对象形状, 避免使用数组 / 对象方法, 避免间接引用, 避免缓存未命中, 避免使用大对象等'
+images: ['https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0422-coverImg_169_202442211134.png']
+---
+
+# 优化 JavaScript
+
+[原文地址](https://romgrk.com/posts/optimizing-javascript)
+
+JavaScript 代码的运行速度比理论速度要慢得多, 这仅仅是因为没有合适的优化. 下面是一些有用且常见的优化技术总结.
+
+注意, 要权衡性能和可读性, 因此何时优化与可读性的问题需要自己判断.
+
+谈论优化必然需要谈论基准测试. 如果一个函数仅代表实际总体运行时间的一小部分, 那么对这个函数进行几个小时的微优化以使其运行速度提高 100 倍是没有意义的. 如果要进行优化, 第一步也是最重要的一步就是基准测试. 在后面的要点中将会介绍这个主题. 同时也要知道微基准测试通常存在一些缺陷, 可能包括下面介绍的那些. 文中已尽力避免这些陷阱, 不要在没有基准测试的情况下盲目应用下面的要点.
+
+文中为所有可能的情况都提供了可运行的示例. 默认显示在自己的机器上的结果, 你也可以自己运行它们. 尽管不想说, 但 Firefox 在优化游戏已经落后一些, 并且现在只有一小部分人在使用, 所以不推荐使用在 Firefox 上获得的结果作为有用的指标.
+
+## 0. 避免不必要的工作
+
+这听起来很明显, 但必须要在此处说明因为优化的第一步不可能再有别的了: 如果你准备优化, 首先要考虑的就是避免不必要的工作. 这包括缓存, 惰性和增量计算等概念. 根据上下文都有不同的应用方式. 在 React 中, 例如, 使用 `memo()`, `useMemo()` 等其他适用的原生语言.
+
+## 1. 避免字符串的比较
+
+JavaScript 可以轻松隐藏字符串比较的实际成本. 如果需要在 C 语言中进行字符串比较,将使用 `strcmp(a, b)` 方法. JavaScript 中使用 `===` 代替, 所以你看不到 `strcmp`. 但它确定存在, 并且字符串比较通常 (但并非总是) 需要比较两个字符串中的每个字符; 算法复杂度是 `O(n)`. 一种常见的避免字符串的比较方式是 `string-as-enums`. 但是由于 TypeScript 的出现, 应该很容易避免字符串的比较, 以内 `enums` 默认是整数.
+
+![string-comparisons](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-TtPmtr.png)
+
+下面是比较的成本:
+
+![comparisons-cost](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-MaHzRs.jpg)
+
+> 关于基准测试
+> 百分比结果表示 1s 内完成的操作数, 除以案例中最高操作数. 越高越好.
+
+可以看到, 差异可能很大. 这种差异不一定是由于 `strcmp` 的成本, 因为引擎有时会使用字符串池并通过引用进行比较, 但也因为在 JavaScript 引擎中, 整数通常是按值传递的, 而字符串总是作为指针传递的, 而内存访问是昂贵的 (第 5 节). 在字符串密集型的代码中, 这可能会产生巨大的影响.
+
+举个现实世界的例子, 只需要用数字替换字符串常量, 就能使这个 [JSON5 JavaScript](https://github.com/json5/json5/pull/278) 解析器的运行速度提高 2 倍.
+
+> 并没有被合并, 但这就是开源.
+
+## 2. 避免不同结构的对象
+
+JavaScript 引擎通过假设对象具有统一的结构, 以及函数将接收相同结构的对象来尝试优化代码. 这使得引擎可以为所有具有相同结构的对象只存储一次键, 并将值存储在单独的一维数组中. 在 JavaScript 中表现为:
+
+![same-shape-object](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-GyMZgG.jpg)
+
+> 关于术语的解释
+> 在文中使用了 "shape" 来表达这个概念, 但注意, 可能还会发现 "hidden-class" 或 "map", 具体取决于什么引擎.
+
+例如, 在运行时, 如果下面的函数接收两个结构为 `{ x: number, y: number}` 的对象, 引擎将推测未来的对象具有相同的结构, 并生成针对该结构优化的机器代码.
+
+```javascript
+function add(a, b) {
+  return {
+    x: a.x + b.x,
+    y: a.y + b.y,
+  }
+}
+```
+
+如果传递的对象使用 `{ y, x }` 而不是 `{ x, y }` 结构, 那么引擎就必须放弃之前的优化假设, 导致函数的执行速度突然大幅度下降. 这里不必深入了解, 如果想要了解更多细节应该阅读 [mraleph 的精彩文章](https://mrale.ph/blog/2015/01/11/whats-up-with-monomorphism.html), 但需要注意的是 V8 引擎有 3 种不同的模式, 用于处理对象访问: 单态 (monomorphic, 一个结构), 多态 (polymorphic, 2 到 4 个不同的结构) 和超多态 (megamorphic, 5 个及以上结构). 最好让代码保持单态, 因为多态和超多态性能下降是非常明显的:
+
+![mono-poly-mega-morphic](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-HJiabu.jpg)
+
+**如何解决这个问题?**
+
+听起来很简单, 但实际上很难: 确保所创建的对象都有完全相同的结构. 甚至是像在 React 组件中以不同的顺序编写 `props` 这样看似微不足道的小事, 都可能引发这个问题.
+
+例如, 这时在 React 代码库中发现的[简单案例](https://github.com/facebook/react/pull/28569), 但几年以前已经有一个由相同的问题引起的[更高影响的案例](https://v8.dev/blog/react-cliff), 因为使用整数初始化一个对象, 并在之后使用了浮点型. 确实, 改变类型也改变了结构. 整数和浮点数类型隐藏在 `number` 类型中, 妥善处理.
+
+> 数字表示
+> 引擎通常可以将整数编码为值. 例如, V8 使用 32 位的空间来存储一个值, 其中整数被存储为紧凑的 Smi (Small Integer, 小型整数), 但是浮点型和大整数, 会像字符串与对象一样, 通过指针传递. JSC (JavaScriptCore, 苹果公司的 JavaScript 引擎) 采用 64 位编码, 双标记确保所有的数字按照值传递, 和 SpiderMonkey 引擎做的一样; 其余的都传递指针.
+
+## 3. 避免使用数组 / 对象的方法
+
+大家都喜欢函数式编程, 但除非使用 Haskell, OCaml 或 Rust, 这些语言的函数式代码会被编译为高效的机器指令, 否则函数式总是比命令式慢.
+
+```javascript
+const result = [1.5, 3.5, 5.0]
+  .map((n) => Math.round(n))
+  .filter((n) => n % 2 === 0)
+  .reduce((a, n) => a + n, 0)
+```
+
+这些方法的问题是:
+
+1. 它们需要完全复制数组, 并且这些副本之后会被垃圾回收机制清除. 在第 5 节会探索内存 I/O 的问题的更多细节.
+2. N 个操作就会循环 N 次, 然而这些操作可以使用 `for` 循环一次性完成.
+
+![functioanl-imperative](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-RgKWEV.jpg)
+
+`Object.values()`, `Object.keys()`, `Object.entries()` 也遇到类似的问题, 因为分配了额外的数据, 而内存访问是所有性能问题的根本. 在第 5 节会展示.
+
+## 4. 避免间接
+
+在寻找深度性能优化时, 还需要关注的地方是任何形式的间接操作, 主要有三个来源:
+
+```javascript
+const point = { x: 10, y: 20 }
+
+// 1.
+// Proxy objects are harder to optimize because their get/set function might
+// be running custom logic, so engines can't make their usual assumptions.
+const proxy = new Proxy(point, {
+  get: (t, k) => {
+    return t[k]
+  },
+})
+// Some engines can make proxy costs disappear, but those optimizations are
+// expensive to make and can break easily.
+const x = proxy.x
+
+// 2.
+// Usually ignored, but accessing an object via `.` or `[]` is also an
+// indirection. In easy cases, the engine may very well be able to optimize the
+// cost away:
+const x = point.x
+// But each additional access multiplies the cost, and makes it harder for the
+// engine to make assumptions about the state of `point`:
+const x = this.state.circle.center.point.x
+
+// 3.
+// And finally, function calls can also have a cost. Engine are generally good
+// at inlining these:
+function getX(p) {
+  return p.x
+}
+const x = getX(p)
+// But it's not guaranteed that they can. In particular if the function call
+// isn't from a static function but comes from e.g. an argument:
+function Component({ point, getX }) {
+  return getX(point)
+}
+```
+
+代理基准测试目前对 V8 来说特别残酷, 代理对象总是从即时编译器 (JIT) 回退到解释器, 从结果来看, 这种情况可能仍然存在.
+
+![proxy-direct-access](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-oaetlj.jpg)
+
+想要继续展示访问深度嵌套的对象和直接访问的区别, 但引擎非常擅长在[检测到热循环 (频繁执行的循环) 和常量对象时通过逃逸分析来优化对象的访问过程](https://youtu.be/KiWEWLwQ3oI?t=1055). 为了避免这种优化, 引入了一些间接访问的方式
+
+![nested-direct-access](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-5TTqgW.jpg)
+
+## 5. 避免缓存缺失
+
+这个部分需要一些底层的知识, 但对于 JavaScript 同样有意义, 因为文中将会解释. 从 CPU 的视角来看, 从 RAM 中读取数据是缓慢的. 为了提高效率, 主要使用了两种方式.
+
+### 5.1 预取
+
+第一种方式是预取: 它会提前获取更多内存, 希望是会使用到的数据. 它总是猜测, 如果请求一个内存地址, 是否会对随后的内存区域感兴趣. 因此, **按顺序访问**是关键, 在下面的例子中, 可以观察到按随机顺序访问内存对性能的影响.
+
+![sequential-random-access](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-wvNs5F.jpg)
+
+**如何解决这个问题?**
+
+这方面可能是最难实践的, 因为 JavaScript 没有将对象放置在内存中的方法, 但可以利用一些知识来完成, 例如在数据重新排序之前对其进行处理. 但不能假定顺序常见的对象在一段时候后会保持在同一位置, 因为垃圾回收机制可能会移动它们. 有一个例外, 那就是数字数组, 尤其是 `TypedArray` 类型的数组:
+
+```javascript
+// from this
+const points = [
+  { x: 0, y: 5 },
+  { x: 0, y: 10 },
+]
+
+// to this
+const points = new Int64Array([0, 5, 0, 10])
+```
+
+更多详细的例子, 点击[这个链接](https://mrale.ph/blog/2018/02/03/maybe-you-dont-need-rust-to-speed-up-your-js.html#optimizing-parsing---reducing-gc-pressure).
+
+> 注意, 这个链接中包含了一些过时的优化, 但总体来说仍然准确.
+
+### 5.2 在 L1/2/3 中缓存
+
+CPU 采用的第二种优化是使用 L1/L2/L3 中的缓存: 它们就像更快的 RAM, 但同时也更昂贵, 所以它们要小得多. 它们包含 RAM 数据, 但像 LRU 缓存一样. 当数据被频繁访问时 (热门数据) 进入, 并在新数据需要这些空间时重新写回 RAM 中. 因此关键在于尽可能减少数据的使用量, 以确保工作集可以保留在这些快速缓存中. 下面的例子中, 可以观察到一次破坏这些缓存层可能带来的影响.
+
+![L1-L2-L3-caches](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-JAdjWE.jpg)
+
+**如何解决这个问题?**
+
+**毫不留情地删除**所有可能的数据和内存分配. 数据集越小, 程序运行越快. 内存 I/O 是 95% 的程序的性能瓶颈. 另一个好的策略是将你的工作分成多个小块 (chunk), 并确保每次只处理一个小的数据集.
+
+更多关于 CPU 和内存的细节, 点击[这个链接](https://people.freebsd.org/~lstewart/articles/cpumemory.pdf).
+
+> 关于不可变的数据结构
+> 不可变对清晰度和正确性来说非常重要, 但在性能方面, 更新一个不可变数据结构需要创建副本, 这会增加内存的 I/O 操作从而清空缓存. 应当尽可能避免使用不可变的数据结构.
+
+> 关于 \{...spread} 操作
+> 非常方便, 但每次使用都会在内存中创建一个新的对象, 更多的内存 I/O, 更慢的缓存.
+
+## 6. 避免使用大型对象
+
+正如第 2 节中说明的, 引擎使用结构优化对象. 然后, 当结构变得太大时, 引擎处理使用常规的 hashmap (像 `Map` 对象) 外没有别的选择. 正如在第 5 节中看到的, 缓存遗失明显降低性能. 哈希映射很容易遇到这种情况, 因为它们的数据通常是在它们所占据的内存中随机且均匀分布的. 接下来看一些按用户 ID 索引的一些用户集合的示例, 来观察这种情况是如何影响性能的.
+
+![hashmap-direct-access](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-YGfcMQ.jpg)
+
+还可以观察随着对象大小的增长, 性能如何不断下降:
+
+![large-hashmap-direct-access](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0418-BPyTbY.jpg)
+
+**如何解决这个问题?**
+
+如上所述, 避免频繁引用大型对象. 最好事先将对象转换为数组. 将数据组织成模型上直接附带 ID 的形式会有所帮助, 这样以来, 可以直接使用 `Object.values()` 方法获取所有值, 而无需通过键映射查找对应的 ID.
+
+## 7. 使用 `eval`
+
+有些 JavaScript 模式对引擎来说很难进行优化, 但使用 `eval()` 函数或其变体, 可以使这些模式消失. 在下面的例子中, 可以观察到如何使用 `eval()` 避免创建一个动态键名对象的额外开销:
+
+![without-with-eval](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0421-whwAAg.jpg)
+
+eval 的另一个好的用例是在编译一个条件过滤函数时, 可以排除那些确定不会被执行的代码分支. 总体而言, 任何将要在频繁执行的循环中运行的函数, 都是进行此类优化的良好对象.
+
+显而易见, 使用 `eval()` 时需要遵循一些常见的安全警告: 绝对不要信任用户输入, 确保传递给 `eval()` 执行的代码都经过了严格的清理, 避免产生任何跨站脚本 (XSS) 攻击的风险. 此外, 还应注意, 在一些环境中, 如设置了内容安全策略 (CSP) 的浏览器页面, 可能不允许使用 `eval()` 函数.
+
+## 8. 谨慎使用字符串
+
+正如之前所看到的, 字符串的操作成本比看起来要高. 字符串的复杂性比表面上的要高, 但如果使用得当效率会高很多.
+
+由于 JavaScript 的使用场景, 字符串操作成为了其核心部分. 为了优化处理大量字符串的代码, 引擎不得不变得更创新. 意思是, 根据使用场景的不同, String 对象在 C++ 中有不同的多种字符串表示方式. 应当关注常见的两种方式, 因为不仅适用于 V8, 也普遍适用于其他引擎.
+
+首先, 使用 `+` 进行字符串拼接时, 不会创建两个字符串的副本. 而是为每个子字符串创建指针. 如果用 TypeScript 表示, 看起来像下面那样:
+
+```typescript
+class String {
+  abstract value(): char[] {}
+}
+
+class BytesString {
+  constructor(bytes: char[]) {
+    this.bytes = bytes
+  }
+  value() {
+    return this.bytes
+  }
+}
+
+class ConcatenatedString {
+  constructor(left: String, right: String) {
+    this.left = left
+    this.right = right
+  }
+  value() {
+    return [...this.left.value(), ...this.right.value()]
+  }
+}
+
+function concat(left, right) {
+  return new ConcatenatedString(left, right)
+}
+
+const first = new BytesString(['H', 'e', 'l', 'l', 'o', ' '])
+const second = new BytesString(['w', 'o', 'r', 'l', 'd'])
+
+// See ma, no array copies!
+const message = concat(first, second)
+```
+
+其次, 字符串切片同样不需要创建副本: 它们可以直接指向另一个字符串中的特定区域. 延续上面的例子:
+
+```typescript
+class SlicedString {
+  constructor(source: String, start: number, end: number) {
+    this.source = source
+    this.start = start
+    this.end = end
+  }
+  value() {
+    return this.source.value().slice(this.start, this.end)
+  }
+}
+
+function substring(source, start, end) {
+  return new SlicedString(source, start, end)
+}
+
+// This represents "He", but it still contains no array copies.
+// It's a SlicedString to a ConcatenatedString to two BytesString
+const firstTwoLetters = substring(message, 0, 2)
+```
+
+但问题是: 一旦需要修改这些字节, 也就是开始承担复制成本的时刻, 比如说, 尝试实现一个 `.trimEnd` 方法:
+
+```typescript
+class String {
+  abstract value(): char[] {}
+
+  trimEnd() {
+    // `.value()` here might be calling
+    // our Sliced->Concatenated->2*Bytes string!
+    const bytes = this.value()
+
+    const result = bytes.slice()
+    while (result[result.length - 1] === ' ') result.pop()
+    return new BytesString(result)
+  }
+}
+```
+
+因此, 通过一个例子来比较, 使用可变操作与仅使用字符串拼接这两种方法的区别:
+
+![mutation-concatenation-string](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0421-xIObIm.jpg)
+
+**如何解决这个问题?**
+
+通常来说, 尽可能长时间地避免对字符串进行修改操作. 包括 `.trim()`, `replace()` 等方法. 应该思考如何避免使用这些方法. 在一些引擎中, 模板字符串可能比直接使用 `+` 要慢. 目前 V8 中就是这样, 但之后可能不是, 所以要经常进行基准测试.
+
+关于之前的提到的 SlicedString, 需要注意的是, 如果一个很小的子字符串引用了一个非常大的字符串, 并且这个子字符串一直存在在内存中, 它可能会租这垃圾回收机制回收引用的大字符串. 如果在处理大量文本的过程中频繁提取这样的小的字符串片段, 可能会导致大量内存泄漏.
+
+```javascript
+const large = Array.from({ length: 10_000 })
+  .map(() => 'string')
+  .join('')
+const small = large.slice(0, 50)
+//    ^ will keep `large` alive
+```
+
+解决这个问题的方法是巧妙地使用可变操作. 如果修改较小的字符串, 会强制创建一个新的副本, 并且旧的指向大字符串的指针将会失效:
+
+```javascript
+// replace a token that doesn't exist
+const small = small.replace('#'.repeat(small.length + 1), '')
+```
+
+更多细节查看 [string.h on v8](https://github.com/v8/v8/blob/main/src/objects/string.h) 或 [JSString.h on JavaScriptCore](https://github.com/WebKit/WebKit/blob/main/Source/JavaScriptCore/runtime/JSString.h).
+
+> 关于字符串的复杂性
+> 上面的内容, 实际上, 许多实现细节为字符串的处理增加了复杂度. 不同的字符串表示形式往往有其最小长度限制. 例如, 对于非常短的字符串, 可能就不会采用拼接的方式构建. 此外, 还可能存在一些限制条件, 比如避免出现指向子字符串的子字符串这样的嵌套. 通过阅读上文的 C++, 即使只阅读注释部分, 也可以对这些实现细节有一个大致的了解.
+
+## 9. 使用定制化
+
+性能优化的一个关键理念就是定制: 根据特定应用场景的特定需求调整逻辑. 这通常意味着要指出最有可能成立的条件, 并为这些条件编写代码.
+
+以一个商家为例, 他们可能偶尔需要为其产品列表添加标签. 根据经验, 标签通常是空的, 利用这一信息, 可以为这种特定情况定制化函数:
+
+```javascript
+// setup:
+const descriptions = ['apples', 'oranges', 'bananas', 'seven']
+const someTags = {
+  apples: '::promotion::',
+}
+const noTags = {}
+
+// Turn the products into a string, with their tags if applicable
+function productsToString(description, tags) {
+  let result = ''
+  description.forEach((product) => {
+    result += product
+    if (tags[product]) result += tags[product]
+    result += ', '
+  })
+  return result
+}
+
+// Specialize it now
+function productsToStringSpecialized(description, tags) {
+  // We know that `tags` is likely to be empty, so we check
+  // once ahead of time, and then we can remove the `if` check
+  // from the inner loop
+  if (isEmpty(tags)) {
+    let result = ''
+    description.forEach((product) => {
+      result += product + ', '
+    })
+    return result
+  } else {
+    let result = ''
+    description.forEach((product) => {
+      result += product
+      if (tags[product]) result += tags[product]
+      result += ', '
+    })
+    return result
+  }
+}
+function isEmpty(o) {
+  for (let _ in o) {
+    return false
+  }
+  return true
+}
+```
+
+![specialized](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0422-Ey5H8f.jpg)
+
+这类优化有一定的性能提升, 随着积累, 这些小幅度的提升也是非常可观的. 它们是对于更关键的优化措施如对象结构化和内存 I/O 的有益补充. 但要特别注意的是, 如果场景发生变化, 过度的定制化可能会反过来影响性能. 因此采用定制化策略时要注意谨慎行事.
+
+> 分支预测和无分支代码
+> 消除代码中的分支可以显著提升程序的性能, 这归功于分支預充電技术. 要了解其工作原理, 可以参考 Stack Overflow 的经典问题 [Why is processing a sorted array faster](https://stackoverflow.com/questions/11227809/why-is-processing-a-sorted-array-faster-than-processing-an-unsorted-array) 的答案.
+
+## 10. 数据结构
+
+数据结构值得单独详细深入地讨论. 但记住为特定应用场景选择错误的数据结构, 其带来的影响比上述任何优化都大. 建议熟悉 JavaScript 内置的数据结构, 如 `Map` 和 `Set`, 并学习链表, 优先队列, 树 (红黑树和 B+ 树) 以及 `trie` (前缀树).
+
+作为示例, 可以快速比较一下 Array.includes 方法和 Set.has 方法在处理一个小列表时的性能差异:
+
+![array-set](https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0422-6TA18w.jpg)
+
+正如看到的, 数据结构的选择可以产生非常大的影响.
+
+一个真实的例子, 通过将数组替换为链表, [成功地将某个函数的执行时间从 5s 缩小到 22ms](https://github.com/mui/mui-x/pull/9200).
