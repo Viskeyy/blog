@@ -1,0 +1,355 @@
+---
+title: '立即改进代码的 4 个 React 技巧'
+date: '2024-04-25'
+tags: ['react', 'code']
+draft: false
+summary: '扎实的 React 知识对于前端开发人员来说是最有价值的技能之一. 许多公司不断寻找 React 开发人员, 并愿意支付更多报酬...'
+images: ['https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0425-coverImg_169_202442516389.png']
+---
+
+# 立即改进代码的 4 个 React 技巧
+
+**原文链接**: [4 React Tips to Instantly Improve Your Code](https://javascript.plainenglish.io/4-react-tips-to-instantly-improve-your-code-7456e028cfa3).
+
+扎实的 React 知识对于前端开发人员来说是最有价值的技能之一. 许多公司不断寻找 React 开发人员, 并愿意支付更多报酬. 这就是为什么开发人员不断提升自己很重要, 因为这样的努力非常有价值.
+
+## 从处理程序中返回函数
+
+如果熟悉函数式编程, 就可以很容易理解. 在某种程度上可以简单地称其为 "柯里化". 本质上就是提前设置了函数作为参数.
+
+下面的代码有一个明显的问题, 可以用这种方式解决:
+
+```javascript
+export default function App() {
+  const [user, setUser] = useState({
+    name: '',
+    surname: '',
+    address: '',
+  })
+
+  // First handler
+  const handleNameChange = (e) => {
+    setUser((prev) => ({
+      ...prev,
+      name: e.target.value,
+    }))
+  }
+
+  // Second handler
+  const handleSurnameChange = (e) => {
+    setUser((prev) => ({
+      ...prev,
+      surname: e.target.value,
+    }))
+  }
+
+  // Third handler
+  const handleAddressChange = (e) => {
+    setUser((prev) => ({
+      ...prev,
+      address: e.target.value,
+    }))
+  }
+
+  // what if we need one more input? should we create another handler for it?
+
+  return (
+    <>
+      <input value={user.name} onChange={handleNameChange} />
+      <input value={user.surname} onChange={handleSurameChange} />
+      <input value={user.address} onChange={handleAddressChange} />
+    </>
+  )
+}
+```
+
+**解决方案**:
+
+```javascript
+export default function App() {
+  const [user, setUser] = useState({
+    name: '',
+    surname: '',
+    address: '',
+  })
+
+  const handleInputChange = (field) => {
+    return (e) => {
+      setUser((prev) => ({
+        ...prev,
+        [field]: e.target.value,
+      }))
+    }
+  }
+
+  return (
+    <>
+      <input value={user.name} onChange={handleInputChange('name')} />
+      <input value={user.surname} onChange={handleInputChange('surname')} />
+      <input value={user.address} onChange={handleInputChange('address')} />
+
+      {JSON.stringify(user)}
+    </>
+  )
+}
+```
+
+## 职责分离
+
+编写 "总组件" 是开发人员常犯的错误. 被称为 "总" 是因为它包含许多难以理解和维护的代码行. 强烈建议将组件划分为独立的子模块集.
+
+一个典型的结构是:
+
+- **UI 模块**, 仅负责视觉表达.
+- **逻辑/模型模块**, 仅包含业务逻辑. 自定义 hook 就是一个例子.
+- **Lib 模块**, 包含组件所需的所有必要程序.
+
+下面是一个小的演示示例帮助说明这个概念.
+
+```jsx
+export function ListComponent() {
+  // local state
+  const [list, setList] = useState([])
+
+  // handler to load data from the server
+  const fetchList = async () => {
+    try {
+      const resp = await fetch('https://www.url.com/list')
+      const data = await resp.json()
+
+      setList(data)
+    } catch {
+      showAlert({ text: 'something went wrong' })
+    }
+  }
+
+  // fetch only on mount
+  useEffect(() => {
+    fetchList()
+  }, [])
+
+  // handle delete items
+  const handleDeleteItem = (id) => {
+    return () => {
+      try {
+        fetch(`https://www.url.com/list/${id}`, {
+          method: 'DELETE',
+        })
+        setList((prev) => prev.filter((x) => x.id !== id))
+      } catch {
+        showAlert({ text: 'something went wrong' })
+      }
+    }
+  }
+
+  // render data
+  return (
+    <div className="list-component">
+      {list.map(({ id, name }) => (
+        <div key={id} className="list-component_item">
+          {/*trim long name with ellipsis*/}
+          {name.slice(0, 30) + (name.length > 30 ? '...' : '')}
+
+          <div onClick={handleDeleteItem(id)} className="list-compoent_icon">
+            <DeleteIcon />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+应该首先编写在模型和 UI 中使用的 utils.
+
+```jsx
+export async function getList(onSuccess) {
+  try {
+    const resp = await fetch('https://www.url.com/list')
+    const data = await resp.json()
+
+    onSuccess(data)
+  } catch {
+    showAlert({ text: 'something went wrong' })
+  }
+}
+
+export async function deleteListItem(id, onSuccess) {
+  try {
+    fetch(`https://www.url.com/list/${id}`, {
+      method: 'DELETE',
+    })
+    setList((prev) => prev.filter((x) => x.id !== id))
+  } catch {
+    showAlert({ text: 'something went wrong' })
+  }
+}
+
+export function trimName(name) {
+  return name.slice(0, 30) + (name.length > 30 ? '...' : '')
+}
+```
+
+现在需要实现业务逻辑. 它只是一个返回需要的东西的自定义 hook.
+
+```jsx
+export function useList() {
+  const [list, setList] = useState([])
+
+  const handleDeleteItem = useCallback((id) => {
+    return () => {
+      deleteListItem(id, () => {
+        setList((prev) => prev.filter((x) => x.id !== id))
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    getList(setList)
+  }, [])
+
+  return useMemo(
+    () => ({
+      list,
+      handleDeleteItem,
+    }),
+    [list, handleDeleteItem]
+  )
+}
+```
+
+最后一步就是编写 UI 模块, 然后将它们组合在一起.
+
+```jsx
+export function ListComponentItem({ name, onDelete }) {
+  return (
+    <div className="list-component_item">
+      {trimName(name)}
+
+      <div onClick={onDelete} className="list-component_icon">
+        <DeleteIcon />
+      </div>
+    </div>
+  )
+}
+
+export function ListComponent() {
+  const { list, handleDeleteItem } = useList()
+
+  return (
+    <div className="list-compoent">
+      {list.map(({ id, name }) => (
+        <ListComponentItem key={id} name={name} onDelete={handleDeleteItem(id)} />
+      ))}
+    </div>
+  )
+}
+```
+
+## 使用对象映射而不是条件判断
+
+如果要根据变量显示各种元素, 可以使用下面的小技巧. 使用这个简单的策略可以使组件更具声明性并简化代码理解. 此外, 它使得进一步扩展功能变得更加轻松.
+
+**问题**:
+
+```jsx
+function Account({ type }) {
+  let Component = UsualAccount
+  if (type === 'vip') {
+    Component = VipAccount
+  }
+  if (type === 'moderartor') {
+    Component = ModeratorAccount
+  }
+  if (type === 'admin') {
+    Component = AdminAccount
+  }
+
+  return (
+    <div>
+      <Component />
+      <AccountStatistics />
+    </div>
+  )
+}
+```
+
+**解决方案**:
+
+```jsx
+const ACCOUNTS_MAP = {
+  'vip': VipAccount,
+  'usual': UsualAccount,
+  'admin': AdminAccount,
+  'moderator': ModeratorAccount,
+}
+
+function Account({type}) {
+  const Component = ACCOUNTS_MAP[type]
+
+  return (
+    <div>
+      <Component />
+      <AccountStatistics>
+    </div>
+  )
+}
+```
+
+## 将独立变量置于 React 生命周期之外
+
+这个想法是将不需要 React 组件生命周期方法的逻辑与组件本身分开. 通过使依赖关系更加明确来提高代码清晰度. 因此, 阅读和理解组件变得更容易.
+
+**问题**:
+
+```jsx
+function useItemList() {
+  const defaultItems = [1, 2, 3, 4, 5]
+  const [items, setItems] = useState(defaultItems)
+
+  const toggleArrayItem = (arr, val) => {
+    return arr.includes(val) ? arr.filter((el) => el !== val) : [...arr, val]
+  }
+
+  const handleToggleItem = (num) => {
+    return () => setItems(toggleArrayItem(items, num))
+  }
+
+  return {
+    items,
+    handleToggleItem,
+  }
+}
+```
+
+**解决方案**:
+
+```jsx
+const DEFAULT_ITEMS = [1, 2, 3, 4, 5]
+
+const toggleArrayItem = (arr, val) => {
+  return arr.includes(val) ? arr.filter((el) => el !== val) : [...arr, val]
+}
+
+function useItemsList() {
+  const [items, setItems] = useState(DEFAULT_ITEMS)
+
+  const handleToggleItem = (num) => {
+    return () => {
+      setItems(toggleArrayItem(items, num))
+    }
+  }
+
+  return {
+    items,
+    handleToggleItem,
+  }
+}
+```
+
+## 总结
+
+- 从处理程序返回函数：可以通过提前设置一些函数参数来实现。这可以帮助解决样板代码问题。
+- 分离职责：避免创建一个 “上帝” 组件，其中包含许多难以理解和维护的代码行。相反，将组件分解为独立的子模块集。
+- 使用对象映射而不是条件：如果需要根据变量显示各种元素，可以使用对象映射。这使组件更具声明性，简化了代码理解，并使扩展功能更加容易。
+- 将自变量置于 React 生命周期之外：将不需要 React 组件生命周期方法的逻辑与组件本身分离。这使依赖关系更加明确，使阅读和理解组件更加容易。

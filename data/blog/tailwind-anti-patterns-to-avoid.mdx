@@ -1,0 +1,77 @@
+---
+title: '5 个要避免的 Tailwind CSS 反模式'
+date: '2024-04-29'
+tags: ['tailwind', 'code']
+draft: false
+summary: 'Tailwind 提供了一种实用优先的方式, 有助于快速将设计转换为代码. 但是滥用 Tailwind 也是可能的...'
+images: ['https://cdn.jsdelivr.net/gh/Viskeyy/uPic@master/uPic/0429-coverImg_169_202442911451.png']
+---
+
+# 5 个要避免的 Tailwind CSS 反模式
+
+**原文连接**: [5 Tailwind CSS Anti-Patterns to Avoid](https://spin.atomicobject.com/tailwind-css-anti-patterns/).
+
+Tailwind CSS 在过去几年改变了许多开发人员的游戏规则, 提供了一种实用优先的方式, 有助于快速将设计转化为代码. 这并不是说 Tailwind 本身是一种反模式; 相反, 它是一个非常有用的工具. 它使开发者更快更精细地设计元素. 此外, 它有助于缩小结构和样式之间的差距, 使直接在标记中看到设计更容易.
+
+但是, 就像任何强大的工具一样, 滥用 Tailwind CSS 是可能的, 这会导致代码的可维护行降低和其他并发问题. 下面是使用 Tailwind CSS 时应该警惕的一些反模式.
+
+## 1. 使用内置调色板
+
+Tailwind 带有一个全面的调色板, 非常适合原型制作. 然而, 最终产品仅仅依赖内置调色板会导致品牌缺乏一致性. 更糟糕的是, 可能会进入一种颜色缺乏语义意义的状态, 从而无法在整个应用中统一使用.
+
+相反, 应该为整个项目中使用的所有颜色创建语义名称, 并用它们完全替代默认调色板.
+
+如果想支持多个主题, 考虑定义颜色为 CSS 变量, 而不是写在 Tailwind 配置中. 这允许根据主题的选择为相同语义的名成赋予多种颜色.
+
+## 2. 未充分利用自定义主题
+
+Tailwind 最好的方面之一是它的 `design-by-constraints` 理念. Tailwind 的实用优先的方式不是用神奇的数字设计所有的东西, 而是迫使从预定义的设计理念中选择样式, 从而更容易构建一致的用户界面. 然而, 内置的 Tailwind 主题并不总是匹配应用的设计理念. 正因为如此, 很容易陷入 "神奇类" 的使用, 实用类被随意使用, 而不遵守既定的设计理念.
+
+类似于覆盖默认调色板, 应该配置整个主题以适用于应用的设计理念, 包括排版, 断点, 间隔等. 这将有助于在整个应用中强制使用一致的样式.
+
+## 3. 不使用基于组件的框架
+
+Tailwind 最好在基于组件的架构中使用, 例如 React, Vue 或 Svelte. 虽然可以在常规的 HTML 中使用, 但缺乏重用性导致大量重复. Tailwind 文档建议使用多光标编辑来避免这个问题. 然而, 这是一个冒险的策略.
+
+相比之下, 当使用基于组件的框架时, 可以定义一次组件并在整个应用中重用. 这是一个使用 React 的例子:
+
+```jsx
+// define a reusable Button component using Tailwind utility classes
+const Button = ({ children, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="bg-primary hover:bg-primary-alt text-primary-contrast px-4 py-2"
+    >
+      {children}
+    </button>
+  )
+}
+
+// re-use without having duplicate Tailwind classes
+const App = () => {
+  return (
+    <div>
+      <Button onClick={() => console.log('clicked')}> Click Me </Button>
+      <Button onClick={() => console.log('clicked too')}> Click Me Too </Button>
+    </div>
+  )
+}
+```
+
+## 4. 使用 `@apply` 指令
+
+Tailwind 允许通过 `@apply` 指令在自定义的 CSS 中内联现有的实用类. 虽然对特定用例很有用, 例如在一个第三方库中覆盖样式, 但打破了 Tailwind 的实用优先范式. 实用类的优势之一是它们的可组合性; 可以直接在 HTML 中混合和匹配它们. 当使用 `@apply` 时, 就创建了一组固定的样式, 这些样式不太灵活, 也很难在不返回样式表的情况下自定义.
+
+要有效地使用 `@apply` 指令并避免这些问题, 重要的是:
+
+- 限制在有意义的场景中使用, 例如当需要覆盖来自第三方库的样式时.
+- 确保使用 `@apply` 创建的任何自定义类都是真正可重用的, 而不仅仅是可以有实用类和自包含组件处理的一次性样式.
+
+## 5. 在域级组件中完全使用 Tailwind
+
+虽然 Tailwind 非常适合实现可重用组件库, 但应该到此为止. 如果正在构建满足更高级别业务需求的组件 (例如电子商务网站上的结账表单), 则不应该使用 Tailwind 实用类. 相反, 应该为所有必须的部分构建可重用组件, 包括表单输入, 按钮和布局容器. 否则最终会在前端产生大量重复, 从而更难确保始终使用一致的样式.
+
+## 结论
+
+虽然 Tailwind CSS 提供了一种强大而灵活的实用优先的 Web 应用样式方法, 但重要的是要注意可能损害代码可维护性和可扩展性的常见陷阱. 通过深思熟虑地将 Tailwind 与一致的设计理念集成, 采用基于组件的架构, 并创建可重用组件库, 可以构建干净, 一致且高度可维护的用户界面.
