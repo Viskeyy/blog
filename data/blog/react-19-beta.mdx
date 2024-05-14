@@ -1,0 +1,543 @@
+---
+title: 'React 19 Beta'
+date: '2024-05-14'
+tags: ['react', 'relase']
+draft: false
+summary: ''
+images: ['']
+---
+
+# React 19 Beta
+
+原文地址: [React 19 Beta](https://zh-hans.react.dev/blog/2024/04/25/react-19)
+
+## What's new in React 19
+
+React 19 新特性:
+
+- **Actions**: 支持在过渡中使用异步函数, 自动处理挂起状态, 错误, 表单和乐观更新.
+- **useActionState**: 添加了一个新的钩子，用于处理动作的常见情况.
+- **`<form>` Actions**: 在 React 19 中，`<form>` 元素支持传递函数作为动作和 formAction 属性，以自动提交表单.
+- **useFormStatus**: 添加了一个新的钩子，用于读取父 `<form>` 的状态.
+- **useOptimistic**: 添加了一个新的钩子，用于在数据突变时显示最终状态.
+- **use**: 在 React 19 中，我们引入了一个新的 API 来读取渲染中的资源.
+- **React Server Components**: 在 React 19 中，我们添加了对服务器组件的支持.
+
+React 19 改进:
+
+- **ref as a prop**: 在 React 19 中，你现在可以将 ref 作为属性访问函数组件.
+- **Diffs for hydration errors**: 我们改进了对 hydration 错误的错误报告.
+- **`<Context>` as a provider**: 在 React 19 中，你可以将 `<Context>` 作为提供者呈现，而不是 `<Context.Provider>`.
+- **Cleanup functions for refs**: 我们现在支持从 ref 回调返回清理函数.
+- **useDeferredValue initial value**: 我们添加了一个 initialValue 选项来 useDeferredValue.
+- **Support for Document Metadata**: 在 React 19 中，我们添加了对渲染文档元数据标签的支持.
+- **Support for stylesheets**: 在 React 19 中，我们解决了样式表的复杂性，并提供了对客户端并发渲染和服务器上流式渲染的更深入集成.
+- **Support for async scripts**: 在 React 19 中，我们改进了对异步脚本的支持，允许你在组件树中的任何位置渲染它们.
+- **Support for preloading resources**: 在 React 19 中，我们添加了一些新的 API, 用于加载和预加载浏览器资源.
+- **Compatibility with third-party scripts and extensions**: 我们改进了对第三方脚本和浏览器扩展的兼容性.
+- **Better error reporting**: 我们改进了错误处理，以消除重复，并提供了处理捕获和未捕获错误的选项.
+- **Support for Custom Elements**: 在 React 19 中，我们添加了对自定义元素的完整支持.
+
+### Actions
+
+支持在转换中使用异步函数自动处理准备状态, 错误, 格式以及 `optimistic update`.
+
+> optimistic update: 在确信最终操作会成功的情况下, 先立即更新 UI, 而不是等待服务器的响应. 如果操作成功, UI 就是正确的; 如果失败, UI 会回到更新之前的状态.
+
+使用 `useTransition` 处理状态:
+
+```jsx
+function UpdateName({}) {
+  const [name, setName] = useState('')
+  const [error, setError] = useState(null)
+  const [isPending, startTransition] = useState()
+
+  const handleSubmit = () => {
+    startTransition(async () => {
+      const error = await updateName(name)
+      if (error) {
+        setError(error)
+        return
+      }
+      redirect('/path')
+    })
+  }
+
+  return (
+    <div>
+      <input value={name} onChange={(event) => setName(event.target.value)} />
+      <button onClidk={handleSubmit} disabled={isPending}>
+        Update
+      </button>
+      {error && <p>{error}</p>}
+    </div>
+  )
+}
+```
+
+异步转换会立即设置 `isPending` 为 `true`, 进行异步请求, 然后在任何转换之后将 `isPending` 设置为 `false`.
+
+---
+
+**按照惯例,** **使用异步转换的函数被叫作 "Actions".**
+Actions 会自动管理提交数据:
+
+- **Pending state**: Actions 在开始请求时提供 pending state, 并在最后的状态更新确定时自动重置.
+- **Optimistic updates**: Actions 支持新的 `useOptimistic` hook, 因此可以在提交请求时向用户展示即时反馈.
+- **Error handling**: Actions 提供错误处理因此可以在请求失败时显示错误边界, 并自动将 `optimistic update` 回滚到原始值.
+- **Forms**: `<form>` 标签现在支持传递 `action` 和 `formAction` 作为 props. 默认传递的 `action` props 是 Actions, 并会在提交后自动重置 from.
+
+---
+
+在 Actions 的基础上, React 19 引入 `useOptimistic` 管理 `optimistic updates`, 以及处理通常情况下的 Actions 的新 hook `React.useActionState`. 在 `react-dom` 中添加 `<from>` Actions 用于自动管理 forms, 以及支持通常情况下 froms 中的 Actions 的 `useFormStatus`.
+
+```jsx
+function ChangeName({ name, setName }) {
+  const [error, submitAction, isPending] = useActionState(async (previousState, formData) => {
+    const error = await updateName(formData.get('name'))
+    if (error) {
+      return error
+    }
+    redirect('/path')
+    return null
+  })
+
+  return (
+    <form action={submitAction}>
+      <input type="text" name="name" />
+      <button type="submit" disabled={isPending}>
+        Update
+      </button>
+      {error && <p>{error}</p>}
+    </form>
+  )
+}
+```
+
+### 新的 hook: `useActionState`
+
+`useActionState` 使通常情况下的 Actions 更简单.
+
+```jsx
+const [error, submitAction, isPending] = useActionState(
+  acync (previousState, newName) => {
+    const error = await updateName(newName);
+    if(error) {
+      return error;
+    }
+    return null;
+  },
+  null,
+)
+```
+
+`useActionState` 接收一个函数 (Action), 并返回包装后的 Action 来调用. 这样可以工作是因为 Action 的组合. 当包裹的 Action 被调用, `useActionState` 会返回 Action 的最后结果作为 `data`, 并将 Action 状态设置为 `pending`.
+
+### React DOM: `<form>` Actions
+
+Actions 也可以和 React 19 中 `react-dom` 中 `<form>` 的新功能交互. 支持向 `<form>`, `<input>`, `<button>` 传递函数作为 `action` 和 `formAction` props, 用于使用 Actions 自动提交.
+
+```jsx
+<form action={actionFunction}>
+```
+
+当 `<form>` 的 Actions 成功, 会为失控组件自动重置表单. 如果需要手动重置, 可以调用新的 `requestFormReset` React DOM API.
+
+### React DOM: 新的 hook: `useFormStatus`
+
+```jsx
+import {useFormStatus} from 'react-dom'
+
+function DesignButton() {
+  const {pending} = useFormStatus();
+  return <button type="submit" disabled={pending} />
+```
+
+`useFormStatus` 读取父级的 `<form>` 的状态, 就好像 form 是 Context 的提供者.
+
+### 新的 hook: `useOptimistic`
+
+在异步请求时, 另一种常见的 UI 模式是改变数据并展示最后的状态. 在 React 19 中新增了 `useOptimistic` hook 以使其更简单.
+
+```jsx
+function ChangeName({ currentName, onUpdateName }) {
+  const [optimisticName, setOptimisticName] = useOptimistic(currentName)
+
+  const submitAction = async (formData) => {
+    const newName = formData.getName('name')
+    setOptimistic(newName)
+    const updatedName = await updateName(newName)
+    onUpdateName(updatedName)
+  }
+
+  return (
+    <form action={submitAction}>
+      <p>Your name is: {optimisticName}</p>
+      <p>
+        <label>Change Name:</label>
+        <input type="submit" name="name" disabled={currentName !== optimisticName} />
+      </p>
+    </form>
+  )
+}
+```
+
+当 `updateName` 请求正在进行时, `useOptimistic` hook 会立即渲染 `optimisticName`. 当更新完成或出现错误, React 会自动切换回 `currentName` 值.
+
+### 新 API: `use`
+
+在渲染时读取资源的新 API.
+
+例如, 可以使用 `use` 读 promise, 并且 React 会 Suspend 知道 promise resolve:
+
+```jsx
+import { use } from 'react'
+
+function Comments({ commentsPromise }) {
+  const comments = use(commentsPromise)
+  return comments.map((comment) => <p key={comment.id}>{comment}</p>)
+}
+
+function Page({ commentsPromise }) {
+  return (
+    <Suspense>
+      <Comments CommentsPromise={commentsPromise} />
+    </Suspense>
+  )
+}
+```
+
+> **`use` 不支持在渲染时创建 promise**
+
+也可以读取 context
+
+```jsx
+import { use } from 'react'
+import ThemeContext from './ThemeContext'
+
+function Heading({ children }) {
+  if (children === null) {
+    return null
+  }
+
+  const theme = use(ThemeContext)
+  return <h1 style={{ color: theme.color }}>{children}</h1>
+}
+```
+
+`use` API 只能在 render 时调用. 不像 hook, `use` 可以条件调用.
+
+### React Server Components
+
+#### Server Components
+
+服务端组件是是新的选择, 允许提前渲染组件, 在 bundling 之前, 在客户端应用分离的环境中或 SSR 服务. 在 React 服务端组件中这个分离的环境就是 server. 服务端组件在 CI 服务器上构建时能运行一次, 或者它们可以在使用 web 服务每次请求时运行.
+
+这意味着服务端组件附带的库现在可以将 React 19 定位为具有 React 服务端导出条件的对等依赖项, 以便在全栈支持 React 架构的框架中使用.
+
+---
+
+**如何构建以支持服务端组件?**
+
+虽然 React 19 是稳定版本并且在主要版本之间不会做大更改, 但用于实现 React 服务端组件的 bundler 或框架的底层 API 不遵循 semver, 并且可能在 React 19.x 小版本之间做大更改.
+
+---
+
+#### Server Actions
+
+Server Actions 允许客户端组件调用在服务端的异步函数.
+
+当一个 server Action 是使用 `"use server"` 直接定义的, 框架会自动创建一个这个 server action 的引用, 并将这个引用传递给客户端. 当在客户端被调用时, React 会向服务端发送一个请求以执行这个函数, 然后返回结果.
+
+---
+
+**没有针对服务端组件的指令.**
+
+一个常见的误解是, 服务端组件由 `"use server"` 表示, 但服务端组件没有指令. `"use server"` 是用于 server actions 的指令.
+
+---
+
+Server Actions 可以在 Server Components 中创建, 并作为 props 传递个客户端组件, 或者被引入并在客户端组件中使用.
+
+### React 19 的改进
+
+#### `ref` 作为 prop
+
+在 React 19 中, `ref` 可以作为函数组件的 prop.
+
+```jsx
+function MyInput({ placeholder, ref }) {
+  return <input placeholder={placeholder} ref={ref} />
+}
+
+// ...
+;<MyInput ref={ref} />
+```
+
+新的函数组件不再需要 `forwardRef`, 在未来将会发布一个代码补丁来自动更新组件以使用新的 `ref` prop. 在之后的版本会弃用并删除 `forwardRef`.
+
+---
+
+传递给类的 `refs` 不会作为 props 传递, 因为他们引用组件实例.
+
+---
+
+#### Hydration 错误中的差异
+
+也改进了 `react-dom` 中 hydration 错误的错误报告. 例如, 在 DEV 中打印多个错误而没有任何匹配的信息:
+
+```shellsession
+Warning: Text content did not match. Server: “Server” Client: “Client”
+  at span
+  at App
+Warning: An error occurred during hydration. The server HTML was replaced with client content in <div>.
+Warning: Text content did not match. Server: “Server” Client: “Client”
+  at span
+  at App
+Warning: An error occurred during hydration. The server HTML was replaced with client content in <div>.
+Uncaught Error: Text content does not match server-rendered HTML.
+  at checkForUnmatchedText
+  …
+```
+
+现在打印一条信息:
+
+```shellsession
+Uncaught Error: Hydration failed because the server rendered HTML didn’t match the client. As a result this tree will be regenerated on the client. This can happen if an SSR-ed Client Component used:
+
+- A server/client branch if (typeof window !== 'undefined').
+- Variable input such as Date.now() or Math.random() which changes each time it’s called.
+- Date formatting in a user’s locale which doesn’t match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  <App>
+    <span>
++    Client
+-    Server
+
+  at throwOnHydrationMismatch
+  …
+```
+
+#### `Context` 作为 provider
+
+能够渲染 `<Context>` 作为 provider 而不是 `<Context.Provider>`.
+
+```jsx
+const ThemeContext = createContext('')
+
+function App({ children }) {
+  return <ThemeContext value="dark">{children}</ThemeContext>
+}
+```
+
+新的 Context providers 可以使用 `<Context>` 并在将来发布代码补丁转换现有的 providers. 之后会弃用 `<Context.Provider>`.
+
+#### refs 的清理函数
+
+支持在 `ref` 回调函数中返回清理函数:
+
+```jsx
+<input ref={(ref) => {
+  // ...
+  return () => { ... }
+}} />
+```
+
+当组件卸载时, React 会调用 `ref` 回调中返回的清理函数. 这对 DOM, 类式组件和 `useImperativeHandle` refs 都有效.
+
+---
+
+之前, 在组件卸载时 React 会用 null 调用 `ref` 函数. 如果 `ref` 中返回了清理函数, React 会跳过这一步.
+
+在之后的版本中, 将会弃用这种方式.
+
+---
+
+由于引入了 ref 的清理函数, 在 `ref` 回调用返回任何其他东西都会被 TypeScript 拒绝. 这个修改通常用于停止使用隐式返回, 例如:
+
+```jsx
+;-(<div ref={(current) => (instance = current)} />) +
+(
+  <div
+    ref={(current) => {
+      instance = current
+    }}
+  />
+)
+```
+
+之前的代码返回 `HTMLDivElement` 的实例, 而 TypeScript 不知道这应该是一个清理函数还是不应该返回一个清理函数.
+
+#### `useDeferredValue` 的初始值
+
+在 `useDeferredValue` 添加 `initialValue` 选项.
+
+```jsx
+function Search({ deferredValue }) {
+  // On initial render the value is ''.
+  // Then a re-render is scheduled with the deferredValue.
+  const value = useDeferredValue(deferredValue, '')
+
+  return <Results query={value} />
+}
+```
+
+提供了 `initialValue` 之后, 在组件初始化渲染时 `useDeferredValue` 会返回它并作为 `value`, 但在背后重新渲染是会返回 `defaultValue`.
+
+#### 支持文档 Metadata
+
+在 HTML 中, 文档元数据标签例如 `<title>`, `<link>` 和 `<meta>` 放置在 `<head>` 部分. 在 React 中, 决定应用元数据的组件可能离渲染 `<head>` 很远, 或者 React 根本不渲染 `<head>`.
+
+在过去, 这些元素需要在 effect 中手动插入, 或者使用 `react-helmet` 库, 并且在 React 中使用服务端渲染时需要格外小心处理.
+
+在 React 19 中, 添加了原生支持组件渲染文档元数据标签:
+
+```jsx
+function BlogPost({ post }) {
+  return (
+    <article>
+      <h1>{post.title}</h1>
+      <title>{post.title}</title>
+      <meta name="author" content="Josh" />
+      <link rel="author" href="https://www.exampel.com" />
+      <meta name="keywords" content={post.keywords} />
+      <p>...</p>
+    </article>
+  )
+}
+```
+
+当 React 渲染这个组件时, 会检查 `<title>`, `<link>` 和 `<meta>` 标签, 并自动提升到文档的 `<head>` 部分. 通过原生支持元数据标签, 能够确保它们运行为客户端组件, SSR 流和服务端组件.
+
+#### 支持样式表
+
+```jsx
+function ComponentOne() {
+  return (
+    <Suspense fallback="loading...">
+      <link rel="stylesheet" href="foo" precedence="default" />
+      <link rel="stylesheet" href="bar" precedence="high" />
+      <article class="foo-class bar-class">
+        {...}
+      </article>
+    </Suspense>
+  )
+}
+
+function ComponentTwo() {
+  return (
+    <div>
+      <p>{...}</p>
+      <link rel="stylesheet" href="baz" precedence="default" />  <-- will be inserted between foo & bar
+    </div>
+  )
+}
+```
+
+在服务器端渲染期间, React将在 `<head>` 中包含样式表, 这可确保浏览器在加载之前不会绘制. 如果在开始流式传输后发现样式表较晚, React将确保样式表在显示依赖于该样式表的悬念边界的内容之前插入到客户端的 `<head>` 中.
+
+在客户端渲染期间, React 将等待新渲染的样式表加载后再提交渲染. 如果您在应用程序中的多个位置渲染此组件, React将仅在文档中包含一次样式表.
+
+#### 支持异步脚本
+
+```jsx
+function MyComponent() {
+  return (
+    <div>
+      <script async={true} src="..." />
+      Hello World
+    </div>
+  )
+}
+
+function App() {
+  <html>
+    <body>
+      <MyComponent>
+      ...
+      <MyComponent> // won't lead to duplicate script in the DOM
+    </body>
+  </html>
+}
+```
+
+在所有渲染环境中, 异步脚本将被消重, 这样React将只加载和执行一次脚本, 即使它是由多个不同的组件渲染. 在 SSR 中, 异步脚本将包含在 `<head>` 中, 并优先考虑阻止绘制的更关键资源, 如样式表, 字体和图像预加载.
+
+#### 支持预加载资源
+
+React 19 包含许多用于加载和预加载浏览器资源的新API, 以尽可能轻松地构建出色的体验, 而不会因资源加载效率低下而受到阻碍.
+
+```jsx
+import { prefetchDNS, preconnect, preload, preinit } from 'react-dom'
+function MyComponent() {
+  preinit('https://.../path/to/some/script.js', { as: 'script' }) // loads and executes this script eagerly
+  preload('https://.../path/to/font.woff', { as: 'font' }) // preloads this font
+  preload('https://.../path/to/stylesheet.css', { as: 'style' }) // preloads this stylesheet
+  prefetchDNS('https://...') // when you may not actually request anything from this host
+  preconnect('https://...') // when you will request something but aren't sure what
+}
+```
+
+```html
+<!-- the above would result in the following DOM/HTML -->
+<html>
+  <head>
+    <!-- links/scripts are prioritized by their utility to early loading, not call order -->
+    <link rel="prefetch-dns" href="https://..." />
+    <link rel="preconnect" href="https://..." />
+    <link rel="preload" as="font" href="https://.../path/to/font.woff" />
+    <link rel="preload" as="style" href="https://.../path/to/stylesheet.css" />
+    <script async="" src="https://.../path/to/some/script.js"></script>
+  </head>
+  <body>
+    ...
+  </body>
+</html>
+```
+
+这些 API 可用于优化初始页面加载, 方法是将字体等其他资源的发现移出样式表加载. 它们还可以通过预取预期导航使用的资源列表, 然后在单击甚至悬停时立即预加载这些资源, 从而加快客户端更新速度.
+
+#### 兼容第三方脚本和扩展
+
+在 React 19 中, `<head>` 和 `<body>` 中的意外标签将被跳过了, 以避免不匹配错误. 如果 React 由于不相关的 hydration 不匹配而需要重新渲染整个文档, 它将保留第三方脚本和浏览器扩展插入的样式表.
+
+#### 更好的错误报告
+
+在 React 19 中改进了错误处理, 以删除重复并提供处理 caught 和 uncaught 错误的选项.
+
+```shellsession
+Error: hit
+  at Throws
+  at renderWithHooks
+  …
+
+The above error occurred in the Throws component:
+  at Throws
+  at ErrorBoundary
+  at App
+
+React will try to recreate this component tree from scratch using the error boundary you provided, ErrorBoundary.
+  at ErrorBoundary
+  at App
+```
+
+还添加两个新的根选项以完成 `onRecoverableError`:
+
+- `onCaughtError`
+- `onUncaughtError`
+- `onRecoverableError`
+
+#### 支持自定义元素
+
+全面支持自定义元素并在 `Custom Element Everywhere` 中通过所有测试.
+
+在 React 19 中, 通过下面的策略, 添加了支持在客户端和在 SSR 期间工作的属性:
+
+- **Server Side Rendering**: 如果传递给自定义组件的 props 的类型是 `sting`, `number` 等原始值或者值为 `true`, 则会呈现为 `attributes`. 具有非原始类型 ( `object`, `symbol`, `function` 或值为 `false`) 的 props 会被省略.
+- **Client Side Rendering**: 与自定义元素实例上的属性匹配的 props 将被分配为 `properties`, 其他的分配为 `attributes`.
